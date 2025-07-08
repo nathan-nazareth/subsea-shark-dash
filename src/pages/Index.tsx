@@ -1,152 +1,32 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
 import Submarine from '../components/Submarine';
-import Shark from '../components/Shark';
-import SeaSerpent from '../components/SeaSerpent';
-import Kraken from '../components/Kraken';
-import Jellyfish from '../components/Jellyfish';
 import GameOver from '../components/GameOver';
-
-interface CreatureType {
-  id: number;
-  x: number;
-  y: number;
-  type: 'shark' | 'serpent' | 'kraken' | 'jellyfish';
-}
+import GameUI from '../components/GameUI';
+import StartScreen from '../components/StartScreen';
+import CreatureRenderer from '../components/CreatureRenderer';
+import { useGameState } from '../hooks/useGameState';
+import { useKeyboardControls } from '../hooks/useKeyboardControls';
+import { useCollisionDetection } from '../hooks/useCollisionDetection';
+import { useGameLoop } from '../hooks/useGameLoop';
 
 const Index = () => {
-  const [gameStarted, setGameStarted] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
-  const [score, setScore] = useState(0);
-  const [submarineY, setSubmarineY] = useState(300);
-  const [creatures, setCreatures] = useState<CreatureType[]>([]);
-  const [keys, setKeys] = useState({ up: false, down: false });
+  const gameState = useGameState();
+  const { checkCollision } = useCollisionDetection();
+  const keys = useKeyboardControls(gameState.gameStarted, gameState.gameOver, gameState.startGame);
   
-  const gameLoopRef = useRef<number>();
-  const sharkIdRef = useRef(0);
-  const gameSpeed = 4;
-  const submarineSpeed = 3;
-
-  const startGame = () => {
-    setGameStarted(true);
-    setGameOver(false);
-    setScore(0);
-    setSubmarineY(300);
-    setCreatures([]);
-  };
-
-  const resetGame = () => {
-    setGameStarted(false);
-    setGameOver(false);
-    setScore(0);
-    setSubmarineY(300);
-    setCreatures([]);
-  };
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.code === 'Space' || e.code === 'ArrowUp') {
-      e.preventDefault();
-      setKeys(prev => ({ ...prev, up: true }));
-      if (!gameStarted && !gameOver) {
-        startGame();
-      }
-    }
-    if (e.code === 'ArrowDown') {
-      e.preventDefault();
-      setKeys(prev => ({ ...prev, down: true }));
-    }
-  }, [gameStarted, gameOver]);
-
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
-    if (e.code === 'Space' || e.code === 'ArrowUp') {
-      setKeys(prev => ({ ...prev, up: false }));
-    }
-    if (e.code === 'ArrowDown') {
-      setKeys(prev => ({ ...prev, down: false }));
-    }
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [handleKeyDown, handleKeyUp]);
-
-  const checkCollision = (submarineX: number, submarineY: number, sharkX: number, sharkY: number) => {
-    const submarineWidth = 80;
-    const submarineHeight = 40;
-    const sharkWidth = 60;
-    const sharkHeight = 30;
-    
-    return (
-      submarineX < sharkX + sharkWidth &&
-      submarineX + submarineWidth > sharkX &&
-      submarineY < sharkY + sharkHeight &&
-      submarineY + submarineHeight > sharkY
-    );
-  };
-
-  useEffect(() => {
-    if (!gameStarted || gameOver) return;
-
-    const gameLoop = () => {
-      // Move submarine with smooth movement
-      setSubmarineY(prev => {
-        let newY = prev;
-        if (keys.up) newY -= submarineSpeed;
-        if (keys.down) newY += submarineSpeed;
-        return Math.max(30, Math.min(window.innerHeight - 100, newY));
-      });
-
-      // Move creatures and check collisions
-      setCreatures(prev => {
-        const newCreatures = prev.map(creature => ({
-          ...creature,
-          x: creature.x - gameSpeed
-        })).filter(creature => creature.x > -150);
-
-        // Check collisions
-        const submarineX = 100;
-        for (const creature of newCreatures) {
-          if (checkCollision(submarineX, submarineY, creature.x, creature.y)) {
-            setGameOver(true);
-            return newCreatures;
-          }
-        }
-
-        return newCreatures;
-      });
-
-      // Spawn new creatures much more frequently
-      if (Math.random() < 0.035) {
-        const creatureTypes: CreatureType['type'][] = ['shark', 'serpent', 'kraken', 'jellyfish'];
-        const randomType = creatureTypes[Math.floor(Math.random() * creatureTypes.length)];
-        
-        setCreatures(prev => [...prev, {
-          id: sharkIdRef.current++,
-          x: 1200,
-          y: Math.random() * (window.innerHeight - 200) + 50,
-          type: randomType
-        }]);
-      }
-
-      // Update score
-      setScore(prev => prev + 1);
-
-      gameLoopRef.current = requestAnimationFrame(gameLoop);
-    };
-
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
-
-    return () => {
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-      }
-    };
-  }, [gameStarted, gameOver, keys, submarineY]);
+  useGameLoop({
+    gameStarted: gameState.gameStarted,
+    gameOver: gameState.gameOver,
+    keys,
+    submarineY: gameState.submarineY,
+    gameLoopRef: gameState.gameLoopRef,
+    sharkIdRef: gameState.sharkIdRef,
+    setSubmarineY: gameState.setSubmarineY,
+    setCreatures: gameState.setCreatures,
+    setScore: gameState.setScore,
+    setGameOver: gameState.setGameOver,
+    checkCollision
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-400 via-blue-600 to-blue-900 overflow-hidden relative">
@@ -172,45 +52,19 @@ const Index = () => {
       {/* Game area */}
       <div className="relative w-full h-screen">
         {/* Score */}
-        {gameStarted && (
-          <div className="absolute top-4 right-4 text-white text-2xl font-bold z-10">
-            Score: {Math.floor(score / 10)}
-          </div>
-        )}
+        {gameState.gameStarted && <GameUI score={gameState.score} />}
 
         {/* Submarine */}
-        {gameStarted && <Submarine y={submarineY} />}
+        {gameState.gameStarted && <Submarine y={gameState.submarineY} />}
 
         {/* Sea Creatures */}
-        {creatures.map(creature => {
-          switch (creature.type) {
-            case 'shark':
-              return <Shark key={creature.id} x={creature.x} y={creature.y} />;
-            case 'serpent':
-              return <SeaSerpent key={creature.id} x={creature.x} y={creature.y} />;
-            case 'kraken':
-              return <Kraken key={creature.id} x={creature.x} y={creature.y} />;
-            case 'jellyfish':
-              return <Jellyfish key={creature.id} x={creature.x} y={creature.y} />;
-            default:
-              return null;
-          }
-        })}
+        <CreatureRenderer creatures={gameState.creatures} />
 
         {/* Start screen */}
-        {!gameStarted && !gameOver && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center text-white">
-              <h1 className="text-6xl font-bold mb-8 text-shadow-lg">Submarine Adventure</h1>
-              <p className="text-2xl mb-4">Navigate through shark-infested waters!</p>
-              <p className="text-lg mb-8">Use SPACE or ↑↓ arrows to move up and down</p>
-              <p className="text-xl animate-pulse">Press SPACE to start</p>
-            </div>
-          </div>
-        )}
+        {!gameState.gameStarted && !gameState.gameOver && <StartScreen />}
 
         {/* Game over screen */}
-        {gameOver && <GameOver score={Math.floor(score / 10)} onRestart={resetGame} />}
+        {gameState.gameOver && <GameOver score={Math.floor(gameState.score / 10)} onRestart={gameState.resetGame} />}
       </div>
     </div>
   );
