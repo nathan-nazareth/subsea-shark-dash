@@ -2,12 +2,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Submarine from '../components/Submarine';
 import Shark from '../components/Shark';
+import SeaSerpent from '../components/SeaSerpent';
+import Kraken from '../components/Kraken';
+import Jellyfish from '../components/Jellyfish';
 import GameOver from '../components/GameOver';
 
-interface SharkType {
+interface CreatureType {
   id: number;
   x: number;
   y: number;
+  type: 'shark' | 'serpent' | 'kraken' | 'jellyfish';
 }
 
 const Index = () => {
@@ -15,20 +19,20 @@ const Index = () => {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [submarineY, setSubmarineY] = useState(300);
-  const [sharks, setSharks] = useState<SharkType[]>([]);
+  const [creatures, setCreatures] = useState<CreatureType[]>([]);
   const [keys, setKeys] = useState({ up: false, down: false });
   
   const gameLoopRef = useRef<number>();
   const sharkIdRef = useRef(0);
   const gameSpeed = 4;
-  const submarineSpeed = 5;
+  const submarineSpeed = 3;
 
   const startGame = () => {
     setGameStarted(true);
     setGameOver(false);
     setScore(0);
     setSubmarineY(300);
-    setSharks([]);
+    setCreatures([]);
   };
 
   const resetGame = () => {
@@ -36,7 +40,7 @@ const Index = () => {
     setGameOver(false);
     setScore(0);
     setSubmarineY(300);
-    setSharks([]);
+    setCreatures([]);
   };
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -89,39 +93,43 @@ const Index = () => {
     if (!gameStarted || gameOver) return;
 
     const gameLoop = () => {
-      // Move submarine
+      // Move submarine with smooth movement
       setSubmarineY(prev => {
         let newY = prev;
         if (keys.up) newY -= submarineSpeed;
         if (keys.down) newY += submarineSpeed;
-        return Math.max(50, Math.min(550, newY));
+        return Math.max(30, Math.min(window.innerHeight - 100, newY));
       });
 
-      // Move sharks and check collisions
-      setSharks(prev => {
-        const newSharks = prev.map(shark => ({
-          ...shark,
-          x: shark.x - gameSpeed
-        })).filter(shark => shark.x > -100);
+      // Move creatures and check collisions
+      setCreatures(prev => {
+        const newCreatures = prev.map(creature => ({
+          ...creature,
+          x: creature.x - gameSpeed
+        })).filter(creature => creature.x > -150);
 
         // Check collisions
         const submarineX = 100;
-        for (const shark of newSharks) {
-          if (checkCollision(submarineX, submarineY, shark.x, shark.y)) {
+        for (const creature of newCreatures) {
+          if (checkCollision(submarineX, submarineY, creature.x, creature.y)) {
             setGameOver(true);
-            return newSharks;
+            return newCreatures;
           }
         }
 
-        return newSharks;
+        return newCreatures;
       });
 
-      // Spawn new sharks
-      if (Math.random() < 0.007) {
-        setSharks(prev => [...prev, {
+      // Spawn new creatures much more frequently
+      if (Math.random() < 0.035) {
+        const creatureTypes: CreatureType['type'][] = ['shark', 'serpent', 'kraken', 'jellyfish'];
+        const randomType = creatureTypes[Math.floor(Math.random() * creatureTypes.length)];
+        
+        setCreatures(prev => [...prev, {
           id: sharkIdRef.current++,
           x: 1200,
-          y: Math.random() * 400 + 100
+          y: Math.random() * (window.innerHeight - 200) + 50,
+          type: randomType
         }]);
       }
 
@@ -173,10 +181,21 @@ const Index = () => {
         {/* Submarine */}
         {gameStarted && <Submarine y={submarineY} />}
 
-        {/* Sharks */}
-        {sharks.map(shark => (
-          <Shark key={shark.id} x={shark.x} y={shark.y} />
-        ))}
+        {/* Sea Creatures */}
+        {creatures.map(creature => {
+          switch (creature.type) {
+            case 'shark':
+              return <Shark key={creature.id} x={creature.x} y={creature.y} />;
+            case 'serpent':
+              return <SeaSerpent key={creature.id} x={creature.x} y={creature.y} />;
+            case 'kraken':
+              return <Kraken key={creature.id} x={creature.x} y={creature.y} />;
+            case 'jellyfish':
+              return <Jellyfish key={creature.id} x={creature.x} y={creature.y} />;
+            default:
+              return null;
+          }
+        })}
 
         {/* Start screen */}
         {!gameStarted && !gameOver && (

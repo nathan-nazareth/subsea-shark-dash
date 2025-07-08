@@ -6,7 +6,7 @@ interface SubmarineProps {
 const Submarine = ({ y }: SubmarineProps) => {
   return (
     <div 
-      className="absolute left-20 transition-all duration-100 ease-out z-10"
+      className="absolute left-20 transition-all duration-150 ease-out z-10"
       style={{ top: y }}
     >
       <div className="relative">
